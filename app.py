@@ -114,8 +114,10 @@ if model is not None:
             'focus_score': [focus_score]
         }
 
-        input_df = pd.DataFrame(input_data)[selected_features]
+        input_df = pd.DataFrame(input_data)
 
+        input_df = input_df[scaler.feature_names_in_]
+        
         st.write("Kolom input:", input_df.columns.tolist())
         st.write("Kolom scaler:", scaler.feature_names_in_)
 
