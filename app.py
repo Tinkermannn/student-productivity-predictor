@@ -48,6 +48,43 @@ def load_models():
 
 scaler, selected_features, model = load_models()
 
+
+def prepare_input_data(input_df, selected_features, scaler, model):
+    required_columns = list(selected_features)
+    missing_cols = [
+        col for col in required_columns
+        if col not in input_df.columns
+    ]
+
+    if missing_cols:
+        raise ValueError(f"Kolom tidak ditemukan: {missing_cols}")
+
+    prepared_df = input_df[required_columns]
+
+    # Gunakan scaler hanya jika memang dilatih dengan fitur yang sama.
+    scaler_feature_names = list(
+        getattr(scaler, 'feature_names_in_', [])
+    )
+    scaler_feature_count = getattr(scaler, 'n_features_in_', None)
+    model_feature_count = getattr(model, 'n_features_in_', None)
+
+    if (
+        scaler is not None and
+        scaler_feature_count == len(required_columns) and
+        scaler_feature_names == required_columns
+    ):
+        return scaler.transform(prepared_df)
+
+    if (
+        model_feature_count is not None and
+        model_feature_count != len(required_columns)
+    ):
+        raise ValueError(
+            "Jumlah fitur model tidak cocok dengan selected_features."
+        )
+
+    return prepared_df.values
+
 # Form input
 if model is not None:
 
@@ -125,31 +162,15 @@ if model is not None:
         input_df = pd.DataFrame(input_data)
 
         try:
-            # Samakan urutan dan nama kolom dengan scaler
-            expected_columns = scaler.feature_names_in_
-
-            # Debug info
-            st.write("Kolom model:", expected_columns.tolist())
-            st.write("Kolom input:", input_df.columns.tolist())
-
-            # Validasi kolom
-            missing_cols = [
-                col for col in expected_columns
-                if col not in input_df.columns
-            ]
-
-            if missing_cols:
-                st.error(f"Kolom tidak ditemukan: {missing_cols}")
-                st.stop()
-
-            # Reorder kolom sesuai training
-            input_df = input_df[expected_columns]
-
-            # Scaling
-            input_scaled = scaler.transform(input_df)
+            input_prepared = prepare_input_data(
+                input_df,
+                selected_features,
+                scaler,
+                model
+            )
 
             # Prediksi
-            prediction = model.predict(input_scaled)[0]
+            prediction = model.predict(input_prepared)[0]
 
             # Batasi range
             prediction = max(0, min(100, prediction))
