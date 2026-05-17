@@ -116,6 +116,9 @@ if model is not None:
 
         input_df = pd.DataFrame(input_data)[selected_features]
 
+        st.write("Kolom input:", input_df.columns.tolist())
+        st.write("Kolom scaler:", scaler.feature_names_in_)
+
         input_scaled = scaler.transform(input_df)
 
         prediction = model.predict(input_scaled)[0]
