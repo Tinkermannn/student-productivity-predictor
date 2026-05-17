@@ -61,19 +61,53 @@ def prepare_input_data(input_df, selected_features, scaler, model):
 
     prepared_df = input_df[required_columns]
 
-    # Gunakan scaler hanya jika memang dilatih dengan fitur yang sama.
-    scaler_feature_names = list(
-        getattr(scaler, 'feature_names_in_', [])
-    )
+    scaler_feature_names = list(getattr(scaler, 'feature_names_in_', []))
     scaler_feature_count = getattr(scaler, 'n_features_in_', None)
     model_feature_count = getattr(model, 'n_features_in_', None)
+    model_feature_names = list(getattr(model, 'feature_names_in_', []))
+
+    if model_feature_names and model_feature_names != required_columns:
+        raise ValueError(
+            "Urutan fitur model tidak cocok dengan selected_features."
+        )
 
     if (
         scaler is not None and
         scaler_feature_count == len(required_columns) and
         scaler_feature_names == required_columns
     ):
-        return scaler.transform(prepared_df)
+        scaled_values = scaler.transform(prepared_df)
+        return pd.DataFrame(
+            scaled_values,
+            columns=required_columns
+        )
+
+    # Fallback untuk artefak yang tidak sepenuhnya sinkron:
+    # ambil mean dan scale hanya untuk fitur yang dipakai model.
+    if (
+        scaler is not None and
+        scaler_feature_names and
+        all(col in scaler_feature_names for col in required_columns)
+    ):
+        scaler_index = {
+            feature: idx for idx, feature
+            in enumerate(scaler_feature_names)
+        }
+
+        scaled_df = prepared_df.copy()
+        scaler_means = getattr(scaler, 'mean_', None)
+        scaler_scales = getattr(scaler, 'scale_', None)
+
+        if scaler_means is None or scaler_scales is None:
+            raise ValueError("Scaler tidak memiliki parameter mean/scale.")
+
+        for col in required_columns:
+            idx = scaler_index[col]
+            scaled_df[col] = (
+                prepared_df[col] - scaler_means[idx]
+            ) / scaler_scales[idx]
+
+        return scaled_df
 
     if (
         model_feature_count is not None and
@@ -83,7 +117,7 @@ def prepare_input_data(input_df, selected_features, scaler, model):
             "Jumlah fitur model tidak cocok dengan selected_features."
         )
 
-    return prepared_df.values
+    return prepared_df
 
 # Form input
 if model is not None:
