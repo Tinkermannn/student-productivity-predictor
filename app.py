@@ -24,13 +24,16 @@ st.divider()
 @st.cache_resource
 def load_models():
     try:
-        if (
-            not os.path.exists('scaler_final.pkl')
-            or not os.path.exists('linear_regression_final.pkl')
-            or not os.path.exists('selected_features.pkl')
-        ):
-            st.error("File model tidak ditemukan.")
-            return None, None, None
+        required_files = [
+            'scaler_final.pkl',
+            'linear_regression_final.pkl',
+            'selected_features.pkl'
+        ]
+
+        for file in required_files:
+            if not os.path.exists(file):
+                st.error(f"File {file} tidak ditemukan.")
+                return None, None, None
 
         scaler = joblib.load('scaler_final.pkl')
         selected_features = joblib.load('selected_features.pkl')
@@ -42,6 +45,7 @@ def load_models():
         st.error(f"Gagal memuat model: {e}")
         return None, None, None
 
+
 scaler, selected_features, model = load_models()
 
 # Form input
@@ -52,7 +56,9 @@ if model is not None:
     col1, col2 = st.columns(2)
 
     with col1:
+
         st.markdown("### Akademik")
+
         study_hours = st.number_input(
             "Waktu Belajar per Hari",
             min_value=0.0,
@@ -63,19 +69,20 @@ if model is not None:
 
         attendance = st.slider(
             "Persentase Kehadiran",
-            0.0,
-            100.0,
-            85.0
+            min_value=0.0,
+            max_value=100.0,
+            value=85.0
         )
 
         focus_score = st.slider(
             "Skor Fokus",
-            1,
-            10,
-            7
+            min_value=1,
+            max_value=10,
+            value=7
         )
 
     with col2:
+
         st.markdown("### Gaya Hidup")
 
         sleep_hours = st.number_input(
@@ -96,15 +103,16 @@ if model is not None:
 
         stress_level = st.slider(
             "Tingkat Stres",
-            1,
-            10,
-            5
+            min_value=1,
+            max_value=10,
+            value=5
         )
 
     st.markdown("")
 
     if st.button("Prediksi", use_container_width=True):
 
+        # Input data
         input_data = {
             'study_hours_per_day': [study_hours],
             'sleep_hours': [sleep_hours],
@@ -116,37 +124,60 @@ if model is not None:
 
         input_df = pd.DataFrame(input_data)
 
-        input_df = input_df[scaler.feature_names_in_]
-        
-        st.write("Kolom input:", input_df.columns.tolist())
-        st.write("Kolom scaler:", scaler.feature_names_in_)
+        try:
+            # Samakan urutan dan nama kolom dengan scaler
+            expected_columns = scaler.feature_names_in_
 
-        input_scaled = scaler.transform(input_df)
+            # Debug info
+            st.write("Kolom model:", expected_columns.tolist())
+            st.write("Kolom input:", input_df.columns.tolist())
 
-        prediction = model.predict(input_scaled)[0]
+            # Validasi kolom
+            missing_cols = [
+                col for col in expected_columns
+                if col not in input_df.columns
+            ]
 
-        prediction = max(0, min(100, prediction))
+            if missing_cols:
+                st.error(f"Kolom tidak ditemukan: {missing_cols}")
+                st.stop()
 
-        st.divider()
+            # Reorder kolom sesuai training
+            input_df = input_df[expected_columns]
 
-        st.subheader("Hasil Prediksi")
+            # Scaling
+            input_scaled = scaler.transform(input_df)
 
-        st.metric(
-            label="Skor Produktivitas",
-            value=f"{prediction:.2f} / 100"
-        )
+            # Prediksi
+            prediction = model.predict(input_scaled)[0]
 
-        if prediction >= 80:
-            st.success("Produktivitas sangat baik.")
+            # Batasi range
+            prediction = max(0, min(100, prediction))
 
-        elif prediction >= 60:
-            st.info("Produktivitas cukup baik.")
+            st.divider()
 
-        elif prediction >= 40:
-            st.warning("Produktivitas sedang.")
+            st.subheader("Hasil Prediksi")
 
-        else:
-            st.error("Produktivitas rendah.")
+            st.metric(
+                label="Skor Produktivitas",
+                value=f"{prediction:.2f} / 100"
+            )
+
+            # Interpretasi hasil
+            if prediction >= 80:
+                st.success("Produktivitas sangat baik.")
+
+            elif prediction >= 60:
+                st.info("Produktivitas cukup baik.")
+
+            elif prediction >= 40:
+                st.warning("Produktivitas sedang.")
+
+            else:
+                st.error("Produktivitas rendah.")
+
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat prediksi: {e}")
 
 st.markdown("---")
 st.caption("Kelompok 7 - Dasar Analitika Data")
