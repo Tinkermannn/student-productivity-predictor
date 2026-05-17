@@ -84,11 +84,7 @@ def prepare_input_data(input_df, selected_features, scaler, model):
 
     # Fallback untuk artefak yang tidak sepenuhnya sinkron:
     # ambil mean dan scale hanya untuk fitur yang dipakai model.
-    if (
-        scaler is not None and
-        scaler_feature_names and
-        all(col in scaler_feature_names for col in required_columns)
-    ):
+    if scaler is not None and scaler_feature_names:
         scaler_index = {
             feature: idx for idx, feature
             in enumerate(scaler_feature_names)
@@ -102,10 +98,11 @@ def prepare_input_data(input_df, selected_features, scaler, model):
             raise ValueError("Scaler tidak memiliki parameter mean/scale.")
 
         for col in required_columns:
-            idx = scaler_index[col]
-            scaled_df[col] = (
-                prepared_df[col] - scaler_means[idx]
-            ) / scaler_scales[idx]
+            if col in scaler_index:
+                idx = scaler_index[col]
+                scaled_df[col] = (
+                    prepared_df[col] - scaler_means[idx]
+                ) / scaler_scales[idx]
 
         return scaled_df
 
